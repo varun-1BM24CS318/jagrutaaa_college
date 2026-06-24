@@ -58,16 +58,40 @@ interface LocationButtonProps {
   onDetect: (pincode: string) => void;
 }
 
+import { Geolocation } from '@capacitor/geolocation';
+
 export const LocationButton = ({ onDetect }: LocationButtonProps) => {
   const [loading, setLoading] = React.useState(false);
 
-  const handleDetect = () => {
+  const handleDetect = async () => {
     setLoading(true);
-    // Mocking location detection for demo
-    setTimeout(() => {
-      onDetect('560001');
+    try {
+      // Ensure we have permissions
+      await Geolocation.requestPermissions();
+      
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000
+      });
+      
+      const { latitude, longitude } = position.coords;
+      const token = import.meta.env.VITE_MAPBOX_TOKEN;
+      
+      const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?types=postcode&access_token=${token}`);
+      const data = await res.json();
+      
+      if (data.features && data.features.length > 0) {
+        const pincode = data.features[0].text;
+        onDetect(pincode);
+      } else {
+        alert('Could not determine pincode for your location');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error detecting location or permission denied');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
